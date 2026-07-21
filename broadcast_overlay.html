@@ -75,24 +75,21 @@ body {
 /* Serve dots */
 .serve-dots {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 4px;
   flex-shrink: 0;
-  width: 10px;
+  align-items: center;
 }
 .serve-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.12);
+  background: rgba(127,255,58,0.2);
 }
 .serve-dot.active {
-  background: #ffffff;
-  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  background: #7fff3a;
+  box-shadow: 0 0 6px rgba(127,255,58,0.7);
   animation: pulse 1.3s infinite;
-}
-.serve-dot.used {
-  background: rgba(255,255,255,0.45);
 }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 
@@ -178,21 +175,21 @@ body {
   <!-- Teams -->
   <div class="teams-panel">
     <div class="team-row" id="team-row-1">
+      <div class="team-name" id="t1-name">Team A</div>
+      <div class="game-pips" id="t1-pips"></div>
       <div class="serve-dots" id="serve-dots-1">
         <div class="serve-dot" id="dot-1-1"></div>
         <div class="serve-dot" id="dot-1-2"></div>
       </div>
-      <div class="team-name" id="t1-name">Team A</div>
-      <div class="game-pips" id="t1-pips"></div>
       <div class="team-score" id="t1-score">0</div>
     </div>
     <div class="team-row" id="team-row-2">
+      <div class="team-name" id="t2-name">Team B</div>
+      <div class="game-pips" id="t2-pips"></div>
       <div class="serve-dots" id="serve-dots-2">
         <div class="serve-dot" id="dot-2-1"></div>
         <div class="serve-dot" id="dot-2-2"></div>
       </div>
-      <div class="team-name" id="t2-name">Team B</div>
-      <div class="game-pips" id="t2-pips"></div>
       <div class="team-score" id="t2-score">0</div>
     </div>
   </div>
