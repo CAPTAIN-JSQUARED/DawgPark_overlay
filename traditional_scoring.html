@@ -247,6 +247,21 @@ button, input { font-family: inherit; }
 .util-row { display: flex; gap: 10px; flex-shrink: 0; }
 .util-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px; color: var(--text2); font-size: 11.5px; font-weight: 600; cursor: pointer; text-align: center; }
 .util-btn.undo { color: var(--red); border-color: rgba(255,90,90,0.3); }
+.util-btn.sides { color: var(--accent); border-color: rgba(127,255,58,0.3); }
+
+/* Court flip animation */
+.mini-court {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mini-court.flipping {
+  animation: courtFlip 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes courtFlip {
+  0%   { transform: scaleX(1);   opacity: 1; }
+  45%  { transform: scaleX(0);   opacity: 0.3; }
+  55%  { transform: scaleX(0);   opacity: 0.3; }
+  100% { transform: scaleX(1);   opacity: 1; }
+}
 
 /* ══ GAME OVER OVERLAY ══ */
 #gameover-overlay { display: none; position: fixed; inset: 0; z-index: 200; align-items: center; justify-content: center; background: rgba(10,12,18,0.97); padding: 24px; flex-direction: column; text-align: center; }
@@ -424,6 +439,7 @@ button, input { font-family: inherit; }
 
   <div class="util-row">
     <button class="util-btn undo" onclick="undoLast()">↩ UNDO LAST RALLY</button>
+    <button class="util-btn sides" onclick="changeSides()">⇄ CHANGE SIDES</button>
   </div>
 </div>
 
@@ -529,6 +545,8 @@ var nearIdx = [0, 0];
 
 // Undo rally history
 var rallyHistory = [];
+// Court orientation — purely visual, no effect on game logic or Firebase
+var sidesFlipped = false;
 
 // ══════════════════════════════════════════════
 // SETUP HANDLERS
@@ -585,6 +603,7 @@ function resetGameState() {
   nearIdx = [0, 0];
   serverPlayerIdx = [0, 0]; // player index 0 starts as server for both teams
   rallyHistory = [];
+  sidesFlipped = false;
 }
 
 // ══════════════════════════════════════════════
@@ -762,6 +781,21 @@ function getServerName() {
   return playerNames[sti][serverPlayerIdx[sti]];
 }
 
+function changeSides() {
+  sidesFlipped = !sidesFlipped;
+  // Trigger flip animation
+  var court = document.getElementById('mini-court');
+  court.classList.remove('flipping');
+  // Force reflow so animation restarts
+  void court.offsetWidth;
+  court.classList.add('flipping');
+  court.addEventListener('animationend', function() {
+    court.classList.remove('flipping');
+  }, { once: true });
+  // Re-render court at the midpoint of the animation (when court is invisible)
+  setTimeout(function() { renderCourt(); renderButtons(); }, 250);
+}
+
 function renderCourt() {
   // Team 1 (left half):  right side = BOTTOM row, left side = TOP row
   // Team 2 (right half): right side = TOP row,    left side = BOTTOM row
@@ -769,48 +803,42 @@ function renderCourt() {
   // nearIdx[ti] = playerNames index currently on the RIGHT side for team ti
   // serverPlayerIdx[sti] = which playerNames index is currently serving
   //
-  // Server's row = derived from whether serverPlayerIdx is on right or left side
-
   var sti = servingTeam - 1;
-
-  // Is the server currently on their team's right side?
   var serverIsOnRight = (serverPlayerIdx[sti] === nearIdx[sti]);
 
-  // Team 1: right=bottom, left=top
-  var t1Bot = playerNames[0][nearIdx[0]];
-  var t1Top = playerNames[0][1 - nearIdx[0]];
+  // Apply sides flip — purely visual, no effect on game logic or Firebase
+  var leftTi  = sidesFlipped ? 1 : 0;
+  var rightTi = sidesFlipped ? 0 : 1;
+  var leftTcls  = leftTi  === 0 ? 't1' : 't2';
+  var rightTcls = rightTi === 0 ? 't1' : 't2';
 
-  // Team 2: right=top, left=bottom
-  var t2Top = playerNames[1][nearIdx[1]];
-  var t2Bot = playerNames[1][1 - nearIdx[1]];
+  // Left half: right side = bottom, left side = top
+  var leftBot = playerNames[leftTi][nearIdx[leftTi]];
+  var leftTop = playerNames[leftTi][1 - nearIdx[leftTi]];
 
-  var t1TopServing = false, t1BotServing = false;
-  var t2TopServing = false, t2BotServing = false;
-  var t1TopReceiving = false, t1BotReceiving = false;
-  var t2TopReceiving = false, t2BotReceiving = false;
+  // Right half: right side = top, left side = bottom
+  var rightTop = playerNames[rightTi][nearIdx[rightTi]];
+  var rightBot = playerNames[rightTi][1 - nearIdx[rightTi]];
 
-  if (servingTeam === 1) {
-    if (serverIsOnRight) {
-      // Team 1 right = bottom, Team 2 right = top (diagonal)
-      t1BotServing = true; t2TopReceiving = true;
-    } else {
-      // Team 1 left = top, Team 2 left = bottom (diagonal)
-      t1TopServing = true; t2BotReceiving = true;
-    }
+  var leftTopServing  = false, leftBotServing  = false;
+  var rightTopServing = false, rightBotServing = false;
+  var leftTopReceiving  = false, leftBotReceiving  = false;
+  var rightTopReceiving = false, rightBotReceiving = false;
+
+  var leftServing = servingTeam === (leftTi + 1);
+
+  if (leftServing) {
+    if (serverIsOnRight) { leftBotServing  = true; rightTopReceiving = true; }
+    else                 { leftTopServing  = true; rightBotReceiving = true; }
   } else {
-    if (serverIsOnRight) {
-      // Team 2 right = top, Team 1 right = bottom (diagonal)
-      t2TopServing = true; t1BotReceiving = true;
-    } else {
-      // Team 2 left = bottom, Team 1 left = top (diagonal)
-      t2BotServing = true; t1TopReceiving = true;
-    }
+    if (serverIsOnRight) { rightTopServing = true; leftBotReceiving  = true; }
+    else                 { rightBotServing = true; leftTopReceiving  = true; }
   }
 
-  setCell('cell-left-right',  t1Top, 't1', t1TopServing, t1TopReceiving, 'Left side');
-  setCell('cell-left-left',   t1Bot, 't1', t1BotServing, t1BotReceiving, 'Right side');
-  setCell('cell-right-right', t2Top, 't2', t2TopServing, t2TopReceiving, 'Right side');
-  setCell('cell-right-left',  t2Bot, 't2', t2BotServing, t2BotReceiving, 'Left side');
+  setCell('cell-left-right',  leftTop,  leftTcls,  leftTopServing,  leftTopReceiving,  'Left side');
+  setCell('cell-left-left',   leftBot,  leftTcls,  leftBotServing,  leftBotReceiving,  'Right side');
+  setCell('cell-right-right', rightTop, rightTcls, rightTopServing, rightTopReceiving, 'Right side');
+  setCell('cell-right-left',  rightBot, rightTcls, rightBotServing, rightBotReceiving, 'Left side');
 }
 
 function setCell(id, name, teamCls, isServing, isReceiving, sideLabel) {
@@ -833,14 +861,41 @@ function escHtml(s) {
 }
 
 function renderButtons() {
-  document.getElementById('btn1-label').textContent = teamNames[0].toUpperCase();
-  document.getElementById('btn2-label').textContent = teamNames[1].toUpperCase();
+  // When sides are flipped, swap which button represents which team
+  var leftTeam  = sidesFlipped ? 2 : 1;
+  var rightTeam = sidesFlipped ? 1 : 2;
+  var leftTi    = leftTeam - 1;
+  var rightTi   = rightTeam - 1;
+
+  var btn1 = document.querySelector('.score-btn.t1');
+  var btn2 = document.querySelector('.score-btn.t2');
+
+  // Re-wire onclick to match current visual position
+  var leftBtn  = document.querySelectorAll('.score-btn')[0];
+  var rightBtn = document.querySelectorAll('.score-btn')[1];
+
+  leftBtn.onclick  = function() { awardRally(leftTeam); };
+  rightBtn.onclick = function() { awardRally(rightTeam); };
+
+  // Update labels
+  var leftLabel  = leftBtn.querySelector('.score-btn-label');
+  var rightLabel = rightBtn.querySelector('.score-btn-label');
+  var leftSub    = leftBtn.querySelector('.score-btn-sub');
+  var rightSub   = rightBtn.querySelector('.score-btn-sub');
+
+  leftLabel.textContent  = teamNames[leftTi].toUpperCase();
+  rightLabel.textContent = teamNames[rightTi].toUpperCase();
+
+  // Update border colors to match team
+  leftBtn.className  = 'score-btn t' + leftTeam;
+  rightBtn.className = 'score-btn t' + rightTeam;
+
   if (scoringSystem === 'sideout') {
-    document.getElementById('btn1-sub').textContent = servingTeam === 1 ? 'Wins rally — scores a point' : 'Wins rally — earns the serve';
-    document.getElementById('btn2-sub').textContent = servingTeam === 2 ? 'Wins rally — scores a point' : 'Wins rally — earns the serve';
+    leftSub.textContent  = servingTeam === leftTeam  ? 'Wins rally — scores a point' : 'Wins rally — earns the serve';
+    rightSub.textContent = servingTeam === rightTeam ? 'Wins rally — scores a point' : 'Wins rally — earns the serve';
   } else {
-    document.getElementById('btn1-sub').textContent = 'Wins rally — scores a point';
-    document.getElementById('btn2-sub').textContent = 'Wins rally — scores a point';
+    leftSub.textContent  = 'Wins rally — scores a point';
+    rightSub.textContent = 'Wins rally — scores a point';
   }
 }
 
